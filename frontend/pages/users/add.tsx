@@ -17,31 +17,31 @@ export default function AddUser() {
     email: '',
     password: '',
     role: 'user',
-    status: 'active',
+    status: '',
     profilePhoto: null,
   });
+
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [alert, setAlert] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [name]: value,
-    });
+    }));
   };
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setFormData({
-        ...formData,
-        profilePhoto: file
-      });
-      
-      // Create preview
+      setFormData(prev => ({
+        ...prev,
+        profilePhoto: file,
+      }));
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
@@ -50,11 +50,26 @@ export default function AddUser() {
     }
   };
 
+  const validateForm = () => {
+    if (!formData.name) return 'Name is required.';
+    if (!formData.email) return 'Email is required.';
+    if (!formData.password) return 'Password is required.';
+    if (!formData.role) return 'Role must be selected.';
+    if (!formData.status) return 'Status must be selected.';
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    setAlert(null);
 
+    const validationError = validateForm();
+    if (validationError) {
+      setAlert({ type: 'error', message: validationError });
+      return;
+    }
+
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -62,15 +77,12 @@ export default function AddUser() {
         return;
       }
 
-      // Create FormData object for multipart/form-data (file upload)
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
       formDataToSend.append('email', formData.email);
       formDataToSend.append('password', formData.password);
       formDataToSend.append('role', formData.role);
       formDataToSend.append('status', formData.status);
-      
-      // Add profile photo if selected
       if (formData.profilePhoto) {
         formDataToSend.append('profilePhoto', formData.profilePhoto);
       }
@@ -78,17 +90,28 @@ export default function AddUser() {
       const res = await api.post('/users', formDataToSend, {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
         },
       });
 
       if (res.status === 201 || res.status === 200) {
-        alert('User created successfully!');
-        router.push('/dashboard');
+        setAlert({ type: 'success', message: 'User added successfully!' });
+        setTimeout(() => {
+          router.push('/dashboard');
+        }, 2000);
       }
     } catch (err: any) {
-      console.error('Error creating user:', err);
-      setError(err.response?.data?.message || 'Failed to create user. Please try again.');
+      const errorMessage =
+        err.response?.data?.message || 'Failed to create user. Please try again.';
+
+      if (
+        errorMessage.toLowerCase().includes('email') &&
+        errorMessage.toLowerCase().includes('exist')
+      ) {
+        setAlert({ type: 'error', message: 'Email already exists. Please use a different email.' });
+      } else {
+        setAlert({ type: 'error', message: errorMessage });
+      }
     } finally {
       setLoading(false);
     }
@@ -106,121 +129,130 @@ export default function AddUser() {
         </button>
       </div>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
+      {alert && (
+        <div
+          className={`${
+            alert.type === 'error' ? 'bg-red-100 border-red-400 text-red-700' : 'bg-green-100 border-green-400 text-green-700'
+          } border px-4 py-3 rounded mb-4`}
+        >
+          {alert.message}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4"
+        encType="multipart/form-data"
+      >
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="name">
+          <label htmlFor="name" className="block text-gray-700 text-sm font-bold mb-2">
             Name
           </label>
           <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             id="name"
-            type="text"
             name="name"
+            type="text"
             value={formData.name}
             onChange={handleChange}
-            required
+            placeholder="Enter your name"
+            className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:shadow-outline placeholder:text-gray-500"
           />
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
+          <label htmlFor="email" className="block text-gray-700 text-sm font-bold mb-2">
             Email
           </label>
           <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             id="email"
-            type="email"
             name="email"
+            type="email"
             value={formData.email}
             onChange={handleChange}
-            required
+            placeholder="Enter your email"
+            className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:shadow-outline placeholder:text-gray-500"
           />
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
+          <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">
             Password
           </label>
           <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
             id="password"
-            type="password"
             name="password"
+            type="password"
             value={formData.password}
             onChange={handleChange}
-            required
+            placeholder="Enter your password"
+            className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:shadow-outline placeholder:text-gray-500"
             minLength={6}
           />
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="role">
+          <label htmlFor="role" className="block text-gray-700 text-sm font-bold mb-2">
             Role
           </label>
           <select
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             id="role"
             name="role"
             value={formData.role}
             onChange={handleChange}
+            className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:shadow-outline"
           >
             <option value="user">User</option>
             <option value="admin">Admin</option>
           </select>
         </div>
-        
+
         <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="status">
+          <label htmlFor="status" className="block text-gray-700 text-sm font-bold mb-2">
             Status
           </label>
           <select
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             id="status"
             name="status"
             value={formData.status}
             onChange={handleChange}
+            className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:shadow-outline"
           >
+            <option value="">-- Select Status --</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
             <option value="suspended">Suspended</option>
           </select>
         </div>
-        
+
         <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="profilePhoto">
+          <label htmlFor="profilePhoto" className="block text-gray-700 text-sm font-bold mb-2">
             Profile Photo
           </label>
           <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
             id="profilePhoto"
-            type="file"
             name="profilePhoto"
+            type="file"
             accept="image/*"
             onChange={handleFileChange}
+            className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:shadow-outline"
           />
           {photoPreview && (
             <div className="mt-2">
               <p className="text-sm text-gray-500 mb-1">Preview:</p>
-              <img 
-                src={photoPreview} 
-                alt="Profile preview" 
+              <img
+                src={photoPreview}
+                alt="Profile preview"
                 className="w-24 h-24 object-cover rounded-full border"
               />
             </div>
           )}
         </div>
-        
+
         <div className="flex items-center justify-between">
           <button
-            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
             type="submit"
             disabled={loading}
+            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
           >
             {loading ? 'Creating...' : 'Create User'}
           </button>
@@ -229,4 +261,3 @@ export default function AddUser() {
     </div>
   );
 }
-
