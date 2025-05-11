@@ -11,7 +11,7 @@ interface UserFormData {
   profilePhoto: File | null;
 }
 
-export default function AddUser() {
+const AddUser = () => {
   const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
@@ -28,7 +28,7 @@ export default function AddUser() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -37,7 +37,7 @@ export default function AddUser() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         profilePhoto: file,
       }));
@@ -260,4 +260,6 @@ export default function AddUser() {
       </form>
     </div>
   );
-}
+};
+
+export default AddUser;
