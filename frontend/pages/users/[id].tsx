@@ -309,29 +309,32 @@ export default function EditUser() {
           </select>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="profilePhoto">
-            Profile Photo
-          </label>
-          <input
-            type="file"
-            id="profilePhoto"
-            name="profilePhoto"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="mb-2"
-          />
-          {photoPreview && (
-            <div className="relative w-32 h-32 mt-2">
-              <Image 
-                src={photoPreview} 
-                alt="Profile Preview" 
-                layout="fill" 
-                objectFit="cover"
-              />
-            </div>
-          )}
-        </div>
+        <div className="mb-6">
+                 <label htmlFor="profilePhoto" className="block text-gray-700 text-sm font-bold mb-2">
+                   Profile Photo
+                 </label>
+                 <input
+                   id="profilePhoto"
+                   name="profilePhoto"
+                   type="file"
+                   accept="image/*"
+                   onChange={handleFileChange}
+                   className="shadow border rounded w-full py-2 px-3 text-gray-700 focus:outline-none focus:shadow-outline"
+                 />
+                 {photoPreview && (
+                   <div className="mt-2">
+                     <p className="text-sm text-gray-500 mb-1">Preview:</p>
+                     <div className="relative w-24 h-24">
+                       <Image
+                         src={photoPreview}
+                         alt="Profile preview"
+                         fill
+                         className="object-cover rounded-full border"
+                       />
+                     </div>
+                   </div>
+                 )}
+               </div>
 
         <button
           type="submit"
