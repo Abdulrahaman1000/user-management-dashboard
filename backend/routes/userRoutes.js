@@ -11,14 +11,15 @@ const {
   deleteUser
 } = require('../controllers/userController');
 
-const { protect } = require('../middleware/authMiddleware');
+const { protect, adminOnly } = require('../middlewares/authMiddleware');
 
-// Apply protection to specific routes instead of all routes
-// This approach is more flexible than router.use(protect)
-router.get('/', protect, getUsers);
-router.post('/', protect, createUser);
-router.get('/:id', protect, getUser);
-router.put('/:id', protect, updateUser);
-router.delete('/:id', protect, deleteUser);
+// Admin-only routes
+router.get('/', protect, adminOnly, getUsers);       // View all users
+router.post('/', protect, adminOnly, createUser);    // Create a new user
+router.delete('/:id', protect, adminOnly, deleteUser); // Delete a user
+
+// Routes accessible by any authenticated user (can be restricted further if needed)
+router.get('/:id', protect, getUser);                // Get a specific user
+router.put('/:id', protect, updateUser);             // Update user info
 
 module.exports = router;
