@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import api from '../services/api';
 import Image from 'next/image';
@@ -9,6 +9,23 @@ interface User {
   role?: string;
   name?: string;
   profilePhoto?: string;
+}
+
+interface ApiResponse {
+  users?: User[];
+  data?: User[];
+  pages?: number;
+  totalCount?: number;
+}
+
+interface ApiError {
+  response?: {
+    status?: number;
+    data?: {
+      message?: string;
+    };
+  };
+  message?: string;
 }
 
 export default function Dashboard() {
@@ -24,17 +41,27 @@ export default function Dashboard() {
 
   const router = useRouter();
 
-  useEffect(() => {
-    fetchUsers(1);
-  }, []);
+  const handleLogout = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = '/';
+  };
 
-  useEffect(() => {
-    if (searchQuery && currentPage !== 1) {
-      setCurrentPage(1);
+  // Helper function to extract users data from different response formats
+  const getUsersData = (data: ApiResponse | User[]): User[] => {
+    if (Array.isArray(data)) {
+      return data; // Directly return if `data` is a User[]
     }
-  }, [searchQuery]);
+    if (data && Array.isArray(data.data)) {
+      return data.data; // Return `data.data` if it's a User[]
+    }
+    if (data && Array.isArray(data.users)) {
+      return data.users; // Return `data.users` if it's a User[]
+    }
+    return []; // Return empty array if no valid data
+  };
 
-  const fetchUsers = async (page: number) => {
+  const fetchUsers = useCallback(async (page: number) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -42,51 +69,55 @@ export default function Dashboard() {
         return;
       }
 
-      const res = await api.get(`/users?page=${page}&limit=5`, {
+      const res = await api.get<ApiResponse | User[]>(`/users?page=${page}&limit=5`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      if (res.data?.pages) {
-        setTotalPages(res.data.pages);
-      } else {
-        const totalCount = res.data?.totalCount || 0;
-        const limit = 5;
-        const calculatedPages = Math.ceil(totalCount / limit) || 1;
-        setTotalPages(calculatedPages);
+      const { data } = res;
+      const usersData = getUsersData(data);
+      
+      // Calculate total pages
+      let pages = 1;
+      if (Array.isArray(data)) {
+        pages = Math.ceil(data.length / 5) || 1;
+      } else if (data) {
+        pages = data.pages || Math.ceil((data.totalCount || usersData.length) / 5) || 1;
       }
-
-      setCurrentPage(page);
-
-      let usersData: User[] = [];
-      if (Array.isArray(res.data?.data)) {
-        usersData = res.data.data;
-      } else if (Array.isArray(res.data)) {
-        usersData = res.data;
-      } else if (Array.isArray(res.data?.users)) {
-        usersData = res.data.users;
-      }
-
-      const currentUser = usersData.find(user => user.role === 'admin');
-      setIsAdmin(currentUser ? true : false);
 
       setUsers(usersData);
+      setIsAdmin(usersData.some((user) => user.role === 'admin'));
+      setTotalPages(pages);
+      setCurrentPage(page);
       setLoading(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching users:', err);
-      if (err.response?.status === 401) handleLogout();
+      const error = err as ApiError;
+      if (error.response?.status === 401) {
+        handleLogout();
+      }
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    fetchUsers(1);
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    if (searchQuery && currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchQuery, currentPage]);
 
   const handleAddUser = () => router.push('/users/add');
   const handleEditUser = (userId: string) => router.push(`/users/${userId}`);
 
   const handleDeleteUser = async () => {
     if (!deletingUserId) return;
-
     setSuccess('');
     setLoading(true);
     const token = localStorage.getItem('token');
+
     try {
       const res = await api.delete(`/users/${deletingUserId}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -96,18 +127,12 @@ export default function Dashboard() {
         await fetchUsers(currentPage);
         setShowDeleteModal(false);
         setSuccess('User deleted successfully!');
-        setTimeout(() => setSuccess(''), 3000); // Hide the alert after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error deleting user:', err);
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
-    window.location.href = '/';
   };
 
   const handlePageChange = (page: number) => {
@@ -158,7 +183,6 @@ export default function Dashboard() {
             </button>
           </div>
 
-          {/* Search Input */}
           <div className="mb-4">
             <input
               type="text"
@@ -177,7 +201,7 @@ export default function Dashboard() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Profile</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Role</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -194,10 +218,10 @@ export default function Dashboard() {
                             height={40}
                           />
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-black">{user.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{user._id}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-black">{user.role || 'user'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm flex flex-col sm:flex-row gap-2">
+                        <td className="px-6 py-4">{user.email}</td>
+                        <td className="px-6 py-4 text-sm text-gray-700">{user.name || 'No name provided'}</td>
+                        <td className="px-6 py-4 text-sm">{user.role || 'user'}</td>
+                        <td className="px-6 py-4 text-sm flex flex-col sm:flex-row gap-2">
                           <button
                             onClick={() => handleEditUser(user._id)}
                             className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
@@ -220,7 +244,6 @@ export default function Dashboard() {
                 </table>
               </div>
 
-              {/* Pagination */}
               <div className="flex justify-center mt-4 space-x-2">
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
@@ -249,21 +272,21 @@ export default function Dashboard() {
         <p className="text-xl text-center">You do not have permission to access this page.</p>
       )}
 
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-8 rounded-lg shadow-lg">
-            <h3 className="text-lg font-bold">Are you sure you want to delete this user?</h3>
-            <div className="mt-4 flex gap-4">
+          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full text-black">
+            <h2 className="text-lg font-semibold mb-4">Confirm Deletion</h2>
+            <p className="mb-4">Are you sure you want to delete this user?</p>
+            <div className="flex justify-end gap-4">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded"
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteUser}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded"
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
               >
                 Delete
               </button>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
+import Image from 'next/image';
 import api from '../../services/api';
 
 interface UserFormData {
@@ -100,9 +101,14 @@ const AddUser = () => {
           router.push('/dashboard');
         }, 2000);
       }
-    } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.message || 'Failed to create user. Please try again.';
+    } catch (err: unknown) {
+      let errorMessage = 'Failed to create user. Please try again.';
+      if (typeof err === 'object' && err !== null && 'response' in err) {
+        const error = err as { response?: { data?: { message?: string } } };
+        if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        }
+      }
 
       if (
         errorMessage.toLowerCase().includes('email') &&
@@ -132,7 +138,9 @@ const AddUser = () => {
       {alert && (
         <div
           className={`${
-            alert.type === 'error' ? 'bg-red-100 border-red-400 text-red-700' : 'bg-green-100 border-green-400 text-green-700'
+            alert.type === 'error'
+              ? 'bg-red-100 border-red-400 text-red-700'
+              : 'bg-green-100 border-green-400 text-green-700'
           } border px-4 py-3 rounded mb-4`}
         >
           {alert.message}
@@ -239,11 +247,14 @@ const AddUser = () => {
           {photoPreview && (
             <div className="mt-2">
               <p className="text-sm text-gray-500 mb-1">Preview:</p>
-              <img
-                src={photoPreview}
-                alt="Profile preview"
-                className="w-24 h-24 object-cover rounded-full border"
-              />
+              <div className="relative w-24 h-24">
+                <Image
+                  src={photoPreview}
+                  alt="Profile preview"
+                  fill
+                  className="object-cover rounded-full border"
+                />
+              </div>
             </div>
           )}
         </div>

@@ -1,6 +1,13 @@
-import { useRouter } from 'next/router';
+import { useRouter } from "next/router";
 
-const UserCard = ({ user }: { user: any }) => {
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+const UserCard = ({ user }: { user: User }) => {
   const router = useRouter();
 
   const handleDelete = async () => {

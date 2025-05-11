@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import api from '../../services/api';
+import Image from 'next/image';
 
 interface UserData {
   name: string;
@@ -9,6 +10,38 @@ interface UserData {
   status: string;
   password?: string;
   profilePhoto?: File | null;
+}
+
+interface ApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+    status?: number;
+  };
+  message?: string;
+}
+
+interface UserApiResponse {
+  data?: {
+    name?: string;
+    email?: string;
+    role?: string;
+    status?: string;
+    profilePhoto?: string;
+  };
+  user?: {
+    name?: string;
+    email?: string;
+    role?: string;
+    status?: string;
+    profilePhoto?: string;
+  };
+  name?: string;
+  email?: string;
+  role?: string;
+  status?: string;
+  profilePhoto?: string;
 }
 
 export default function EditUser() {
@@ -26,13 +59,7 @@ export default function EditUser() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    if (router.isReady && router.query.id) {
-      fetchUser();
-    }
-  }, [router.isReady, router.query.id]); // Corrected to include 'router.query.id'
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     if (!router.query.id) {
       console.log('No user ID found in query parameters');
       return;
@@ -48,7 +75,7 @@ export default function EditUser() {
 
       const userId = router.query.id as string;
 
-      const res = await api.get(`/users/${userId}`, {
+      const res = await api.get<UserApiResponse>(`/users/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` },
         timeout: 8000,
       });
@@ -64,24 +91,32 @@ export default function EditUser() {
         email: userData.email || '',
         role: userData.role || 'user',
         status: userData.status || 'active',
+        password: '',
       });
 
       if (userData.profilePhoto) {
         const photoUrl = `${process.env.NEXT_PUBLIC_API_URL || ''}/uploads/${userData.profilePhoto}?ts=${Date.now()}`;
         setPhotoPreview(photoUrl);
       }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to load user data. Please try again.';
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      const errorMessage = error.response?.data?.message || 'Failed to load user data. Please try again.';
       setAlert({ type: 'error', message: errorMessage });
 
-      if (err.response?.status === 401) {
+      if (error.response?.status === 401) {
         localStorage.removeItem('token');
         router.push('/login');
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (router.isReady && router.query.id) {
+      fetchUser();
+    }
+  }, [router.isReady, router.query.id, fetchUser]);
 
   const validateForm = () => {
     if (!formData.name.trim()) return 'Name is required';
@@ -156,11 +191,12 @@ export default function EditUser() {
 
       setAlert({ type: 'success', message: 'User updated successfully!' });
       setTimeout(() => router.push('/dashboard'), 2000);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || 'Failed to update user. Please try again.';
+    } catch (err: unknown) {
+      const error = err as ApiError;
+      const errorMessage = error.response?.data?.message || 'Failed to update user. Please try again.';
       setAlert({ type: 'error', message: errorMessage });
 
-      if (err.response?.status === 401) {
+      if (error.response?.status === 401) {
         localStorage.removeItem('token');
         router.push('/login');
       }
@@ -285,7 +321,16 @@ export default function EditUser() {
             onChange={handleFileChange}
             className="mb-2"
           />
-          {photoPreview && <img src={photoPreview} alt="Profile Preview" className="w-32 h-32 object-cover mt-2" />}
+          {photoPreview && (
+            <div className="relative w-32 h-32 mt-2">
+              <Image 
+                src={photoPreview} 
+                alt="Profile Preview" 
+                layout="fill" 
+                objectFit="cover"
+              />
+            </div>
+          )}
         </div>
 
         <button
