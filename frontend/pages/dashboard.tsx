@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../services/api';
+import Alert from '@/components/Alert';
+
 
 interface User {
   _id: string;
@@ -15,17 +17,21 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+   const [success, setSuccess] = useState("");
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
   const router = useRouter();
 
   useEffect(() => {
     fetchUsers(1);
   }, []);
-  
-  // Add effect to handle search query changes
+
   useEffect(() => {
-    // When search query changes, go back to first page
     if (searchQuery && currentPage !== 1) {
       setCurrentPage(1);
     }
@@ -45,17 +51,15 @@ export default function Dashboard() {
         },
       });
 
-      // Extract pagination data
       if (res.data?.pages) {
         setTotalPages(res.data.pages);
       } else {
-        // Calculate total pages if not provided by API
         const totalCount = res.data?.totalCount || 0;
-        const limit = 5; // Users per page
+        const limit = 5;
         const calculatedPages = Math.ceil(totalCount / limit) || 1;
         setTotalPages(calculatedPages);
       }
-      
+
       setCurrentPage(page);
 
       let usersData: User[] = [];
@@ -101,13 +105,14 @@ export default function Dashboard() {
     router.push(`/users/${userId}`);
   };
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-
+  const handleDeleteUser = async () => {
+      
+    if (!deletingUserId) return;
+     setSuccess("");
     setLoading(true);
     const token = localStorage.getItem('token');
     try {
-      const res = await api.delete(`/users/${userId}`, {
+      const res = await api.delete(`/users/${deletingUserId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -115,11 +120,14 @@ export default function Dashboard() {
 
       if (res.status === 200 || res.status === 204) {
         await fetchUsers(currentPage);
-        alert('User deleted successfully');
+        setShowDeleteModal(false);
+       
+       setSuccess('User deleted successfully!');
+        setShowSuccessAlert(true);
+        setTimeout(() => setShowSuccessAlert(false), 3000); // Hide the alert after 3 seconds
       }
     } catch (err: any) {
       console.error('Error deleting user:', err);
-      alert(`Failed to delete user: ${err.response?.data?.message || 'Unknown error'}`);
       setLoading(false);
     }
   };
@@ -133,7 +141,7 @@ export default function Dashboard() {
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
     setLoading(true);
-    setCurrentPage(page); // Update current page immediately
+    setCurrentPage(page);
     fetchUsers(page);
   };
 
@@ -151,6 +159,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-white text-black p-12 mt-20 max-w-4xl mx-auto">
+        {success && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
+            {success}
+          </div>
+        )}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-500">Dashboard</h1>
         <button 
@@ -221,7 +234,10 @@ export default function Dashboard() {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteUser(user._id)}
+                            onClick={() => {
+                              setDeletingUserId(user._id);
+                              setShowDeleteModal(true); 
+                            }}
                             className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
                           >
                             Delete
@@ -233,7 +249,7 @@ export default function Dashboard() {
                 </table>
               </div>
 
-              {/* Pagination - Always show when in admin view */}
+              {/* Pagination */}
               <div className="flex justify-center mt-4 space-x-2">
                 <button 
                   onClick={() => handlePageChange(currentPage - 1)}
@@ -255,20 +271,36 @@ export default function Dashboard() {
               </div>
             </>
           ) : (
-            <p className="text-gray-600 italic">No users found.</p>
+            <p>No users found.</p>
           )}
         </div>
       ) : (
-        <div className="bg-white shadow rounded-lg p-6 text-black">
-          <h2 className="text-xl font-semibold mb-4">Your User Dashboard</h2>
-          <p className="mb-6">Welcome home!</p>
-          {users.length > 0 && (
-            <div className="border rounded-lg p-4 bg-gray-50">
-              <p className="mb-2"><strong>Email:</strong> {users[0].email}</p>
-              <p><strong>ID:</strong> {users[0]._id}</p>
-              {users[0].name && <p><strong>Name:</strong> {users[0].name}</p>}
+        <p className="text-xl text-center">You do not have permission to access this page.</p>
+      )}
+
+      {/* Success Alert */}
+
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-8 rounded-lg shadow-lg">
+            <h3 className="text-lg font-bold">Are you sure you want to delete this user?</h3>
+            <div className="mt-4 flex gap-4">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded"
+              >
+                Delete
+              </button>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
