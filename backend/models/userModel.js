@@ -1,9 +1,9 @@
 // backend/models/userModel.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // ✅ Switched from 'bcrypt' to 'bcryptjs'
 
 const userSchema = new mongoose.Schema({
-    profilePhoto: {
+  profilePhoto: {
     type: String,
     default: ''
   },
@@ -45,8 +45,8 @@ const userSchema = new mongoose.Schema({
   toJSON: {
     virtuals: true,
     transform: function(doc, ret) {
-      delete ret.password; // Always remove password from JSON output
-      delete ret.__v; // Remove version key
+      delete ret.password;
+      delete ret.__v;
       return ret;
     }
   },
@@ -60,12 +60,12 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-// More robust password hashing
+// More robust password hashing using bcryptjs
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  
+
   try {
-    const salt = await bcrypt.genSalt(12); // Increased salt rounds for better security
+    const salt = await bcrypt.genSalt(12); // Keep same salt rounds
     this.password = await bcrypt.hash(this.password, salt);
     return next();
   } catch (error) {
@@ -73,14 +73,14 @@ userSchema.pre('save', async function(next) {
   }
 });
 
-// Improved password comparison method
+// Password comparison using bcryptjs
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
-// Add a static method for finding by email (for login)
+// Static method for finding by email (for login)
 userSchema.statics.findByEmail = function(email) {
-  return this.findOne({ email }).select('+password'); // Explicitly include password
+  return this.findOne({ email }).select('+password');
 };
 
 const User = mongoose.model('User', userSchema);

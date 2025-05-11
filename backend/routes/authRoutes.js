@@ -1,7 +1,7 @@
 // backend/routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // Updated: use bcryptjs instead of bcrypt
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const { protect } = require('../middlewares/authMiddleware');
@@ -21,7 +21,7 @@ router.post('/login', async (req, res) => {
     try {
       // Try Mongoose model first
       user = await mongoose.model('User').findOne({ email }).select('+password').lean();
-      
+
       // Fallback to native driver
       if (!user && mongoose.connection.db) {
         user = await mongoose.connection.db.collection('users').findOne({ email });
@@ -40,7 +40,7 @@ router.post('/login', async (req, res) => {
     try {
       isMatch = await bcrypt.compare(password, user.password || '');
     } catch (bcryptError) {
-      console.error('Bcrypt error:', bcryptError);
+      console.error('Bcryptjs error:', bcryptError);
       return res.status(500).json({ message: 'Authentication error' });
     }
 
@@ -62,10 +62,10 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    return res.json({ 
+    return res.json({
       token,
       role: user.role,
-      id: user._id 
+      id: user._id
     });
 
   } catch (err) {
