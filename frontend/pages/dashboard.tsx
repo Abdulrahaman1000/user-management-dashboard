@@ -7,6 +7,7 @@ interface User {
   email: string;
   role?: string;
   name?: string;
+  profilePhoto?: string;
 }
 
 export default function Dashboard() {
@@ -21,6 +22,14 @@ export default function Dashboard() {
   useEffect(() => {
     fetchUsers(1);
   }, []);
+  
+  // Add effect to handle search query changes
+  useEffect(() => {
+    // When search query changes, go back to first page
+    if (searchQuery && currentPage !== 1) {
+      setCurrentPage(1);
+    }
+  }, [searchQuery]);
 
   const fetchUsers = async (page: number) => {
     try {
@@ -30,7 +39,7 @@ export default function Dashboard() {
         return;
       }
 
-      const res = await api.get(`/users?page=${page}`, {
+      const res = await api.get(`/users?page=${page}&limit=5`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -39,10 +48,15 @@ export default function Dashboard() {
       // Extract pagination data
       if (res.data?.pages) {
         setTotalPages(res.data.pages);
+      } else {
+        // Calculate total pages if not provided by API
+        const totalCount = res.data?.totalCount || 0;
+        const limit = 5; // Users per page
+        const calculatedPages = Math.ceil(totalCount / limit) || 1;
+        setTotalPages(calculatedPages);
       }
-      if (res.data?.currentPage) {
-        setCurrentPage(res.data.currentPage);
-      }
+      
+      setCurrentPage(page);
 
       let usersData: User[] = [];
 
@@ -119,6 +133,7 @@ export default function Dashboard() {
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
     setLoading(true);
+    setCurrentPage(page); // Update current page immediately
     fetchUsers(page);
   };
 
@@ -134,81 +149,91 @@ export default function Dashboard() {
     </div>
   );
 
-return (
-  <div className="min-h-screen bg-white text-black p-12 mt-20 max-w-4xl mx-auto">
-    <div className="flex justify-between items-center mb-6">
-      <h1 className="text-2xl font-bold text-gray-500">Dashboard</h1>
-      <button 
-        onClick={handleLogout}
-        className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition"
-      >
-        Logout
-      </button>
-    </div>
+  return (
+    <div className="min-h-screen bg-white text-black p-12 mt-20 max-w-4xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-500">Dashboard</h1>
+        <button 
+          onClick={handleLogout}
+          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition"
+        >
+          Logout
+        </button>
+      </div>
 
-    {isAdmin ? (
-      <div>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-black">Manage Users</h2>
-          <button
-            onClick={handleAddUser}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
-          >
-            Add User
-          </button>
-        </div>
+      {isAdmin ? (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-black">Manage Users</h2>
+            <button
+              onClick={handleAddUser}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
+            >
+              Add User
+            </button>
+          </div>
 
-        {/* Search Input */}
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Search by email, ID or role..."
-            className="w-full md:w-1/2 px-4 py-2 border border-gray-300 text-black placeholder-gray-500 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </div>
+          {/* Search Input */}
+          <div className="mb-4">
+            <input
+              type="text"
+              placeholder="Search by email, ID or role..."
+              className="w-full md:w-1/2 px-4 py-2 border border-gray-300 text-black placeholder-gray-500 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
 
-        {filteredUsers.length > 0 ? (
-          <>
-            <div className="overflow-x-auto bg-white shadow rounded-lg mb-4">
-              <table className="min-w-full divide-y divide-gray-200 text-black">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredUsers.map((user) => (
-                    <tr key={user._id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-black">{user.email}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{user._id}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">{user.role || 'user'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm flex flex-col sm:flex-row gap-2">
-                        <button
-                          onClick={() => handleEditUser(user._id)}
-                          className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user._id)}
-                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
-                        >
-                          Delete
-                        </button>
-                      </td>
+          {filteredUsers.length > 0 ? (
+            <>
+              <div className="overflow-x-auto bg-white shadow rounded-lg mb-4">
+                <table className="min-w-full divide-y divide-gray-200 text-black">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Profile</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">ID</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Role</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredUsers.map((user) => (
+                      <tr key={user._id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <img 
+                            src={user.profilePhoto ? 
+                              `${process.env.NEXT_PUBLIC_API_URL}/uploads/${user.profilePhoto}?ts=${Date.now()}` 
+                              : '/default-avatar.jpg'
+                            }
+                            alt="Profile"
+                            className="h-10 w-10 rounded-full object-cover"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-black">{user.email}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{user._id}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-black">{user.role || 'user'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm flex flex-col sm:flex-row gap-2">
+                          <button
+                            onClick={() => handleEditUser(user._id)}
+                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user._id)}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
+              {/* Pagination - Always show when in admin view */}
               <div className="flex justify-center mt-4 space-x-2">
                 <button 
                   onClick={() => handlePageChange(currentPage - 1)}
@@ -228,26 +253,24 @@ return (
                   Next
                 </button>
               </div>
-            )}
-          </>
-        ) : (
-          <p className="text-gray-600 italic">No users found.</p>
-        )}
-      </div>
-    ) : (
-      <div className="bg-white shadow rounded-lg p-6 text-black">
-        <h2 className="text-xl font-semibold mb-4">Your User Dashboard</h2>
-        <p className="mb-6">Welcome home!</p>
-        {users.length > 0 && (
-          <div className="border rounded-lg p-4 bg-gray-50">
-            <p className="mb-2"><strong>Email:</strong> {users[0].email}</p>
-            <p><strong>ID:</strong> {users[0]._id}</p>
-            {users[0].name && <p><strong>Name:</strong> {users[0].name}</p>}
-          </div>
-        )}
-      </div>
-    )}
-  </div>
-);
-
+            </>
+          ) : (
+            <p className="text-gray-600 italic">No users found.</p>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white shadow rounded-lg p-6 text-black">
+          <h2 className="text-xl font-semibold mb-4">Your User Dashboard</h2>
+          <p className="mb-6">Welcome home!</p>
+          {users.length > 0 && (
+            <div className="border rounded-lg p-4 bg-gray-50">
+              <p className="mb-2"><strong>Email:</strong> {users[0].email}</p>
+              <p><strong>ID:</strong> {users[0]._id}</p>
+              {users[0].name && <p><strong>Name:</strong> {users[0].name}</p>}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

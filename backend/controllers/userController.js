@@ -42,9 +42,7 @@ const getUsers = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get single user
-// @route   GET /api/users/:id
-// @access  Private/Admin
+
 const getUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id).select('-password');
   
@@ -100,46 +98,37 @@ const createUser = asyncHandler(async (req, res) => {
   });
 });
 
-// Example updateUser controller
-const updateUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Allow admin or the same user to update
-    if (user._id.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(401).json({ message: 'Not authorized' });
-    }
-
-    // Update fields
-    user.name = req.body.name || user.name;
-    user.email = req.body.email || user.email;
-    user.role = req.body.role || user.role;
-
-    // Update password if provided
-    if (req.body.password) {
-      user.password = req.body.password; // Password hashing should be handled in the model's pre-save hook
-    }
-
-    const updatedUser = await user.save();
-
-    res.json({
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      role: updatedUser.role,
-    });
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+const updateUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  
+  if (!user) {
+    res.status(404);
+    throw new Error('User not found');
   }
-};
 
-// @desc    Delete user
-// @route   DELETE /api/users/:id
-// @access  Private/Admin
+  // Handle file upload
+  if (req.file) {
+    user.profilePhoto = req.file.filename;
+  }
+
+  // Update all fields
+  user.name = req.body.name || user.name;
+  user.email = req.body.email || user.email;
+  user.role = req.body.role || user.role;
+  user.status = req.body.status || user.status; // Add this line
+  
+  if (req.body.password) {
+    user.password = req.body.password; // Pre-save hook will hash it
+  }
+
+  const updatedUser = await user.save();
+  
+  res.json({
+    success: true,
+    data: updatedUser
+  });
+});
+
 const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   

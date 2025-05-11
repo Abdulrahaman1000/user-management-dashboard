@@ -2,15 +2,27 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../../services/api';
 
+interface UserFormData {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  status: string;
+  profilePhoto: File | null;
+}
+
 export default function AddUser() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<UserFormData>({
     name: '',
     email: '',
     password: '',
     role: 'user',
+    status: 'active',
+    profilePhoto: null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -19,6 +31,23 @@ export default function AddUser() {
       ...formData,
       [name]: value,
     });
+  };
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setFormData({
+        ...formData,
+        profilePhoto: file
+      });
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,9 +62,23 @@ export default function AddUser() {
         return;
       }
 
-      const res = await api.post('/users', formData, {
+      // Create FormData object for multipart/form-data (file upload)
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('password', formData.password);
+      formDataToSend.append('role', formData.role);
+      formDataToSend.append('status', formData.status);
+      
+      // Add profile photo if selected
+      if (formData.profilePhoto) {
+        formDataToSend.append('profilePhoto', formData.profilePhoto);
+      }
+
+      const res = await api.post('/users', formDataToSend, {
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
         },
       });
 
@@ -116,7 +159,7 @@ export default function AddUser() {
           />
         </div>
         
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="role">
             Role
           </label>
@@ -132,6 +175,47 @@ export default function AddUser() {
           </select>
         </div>
         
+        <div className="mb-4">
+          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="status">
+            Status
+          </label>
+          <select
+            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            id="status"
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+        
+        <div className="mb-6">
+          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="profilePhoto">
+            Profile Photo
+          </label>
+          <input
+            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            id="profilePhoto"
+            type="file"
+            name="profilePhoto"
+            accept="image/*"
+            onChange={handleFileChange}
+          />
+          {photoPreview && (
+            <div className="mt-2">
+              <p className="text-sm text-gray-500 mb-1">Preview:</p>
+              <img 
+                src={photoPreview} 
+                alt="Profile preview" 
+                className="w-24 h-24 object-cover rounded-full border"
+              />
+            </div>
+          )}
+        </div>
+        
         <div className="flex items-center justify-between">
           <button
             className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
@@ -145,3 +229,4 @@ export default function AddUser() {
     </div>
   );
 }
+

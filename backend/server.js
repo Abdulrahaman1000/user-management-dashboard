@@ -1,8 +1,9 @@
-//backend/server.js
+// backend/server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const path = require('path'); // Add this
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
@@ -16,21 +17,29 @@ connectDB();
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
-// In server.js - Update CORS middleware
+
+// Enhanced CORS configuration
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true,
-  exposedHeaders: ['set-cookie'],
+  exposedHeaders: ['set-cookie', 'Content-Type', 'Authorization'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With']
 }));
-// Add this to your server.js before routes
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Enhanced logging middleware (skip for static files)
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  console.log('Headers:', req.headers);
-  console.log('Body:', req.body);
+  if (!req.path.startsWith('/uploads')) {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+  }
   next();
 });
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -50,4 +59,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Serving static files from: ${path.join(__dirname, 'uploads')}`);
 });

@@ -1,8 +1,8 @@
 // backend/routes/userRoutes.js
-
 const express = require('express');
 const router = express.Router();
-
+const upload = require('../middlewares/uploadMiddleware'); // Add this line
+const { protect, adminOnly } = require('../middlewares/authMiddleware');
 const {
   getUsers,
   getUser,
@@ -11,15 +11,23 @@ const {
   deleteUser
 } = require('../controllers/userController');
 
-const { protect, adminOnly } = require('../middlewares/authMiddleware');
-
 // Admin-only routes
-router.get('/', protect, adminOnly, getUsers);       // View all users
-router.post('/', protect, adminOnly, createUser);    // Create a new user
-router.delete('/:id', protect, adminOnly, deleteUser); // Delete a user
+router.get('/', protect, adminOnly, getUsers);
+router.post('/', 
+  protect,
+  adminOnly,
+  upload.single('profilePhoto'), // Add file upload middleware
+  createUser
+);
 
-// Routes accessible by any authenticated user (can be restricted further if needed)
-router.get('/:id', protect, getUser);                // Get a specific user
-router.put('/:id', protect, updateUser);             // Update user info
+router.delete('/:id', protect, adminOnly, deleteUser);
+
+// Authenticated user routes
+router.get('/:id', protect, getUser);
+router.put('/:id',
+  protect,
+  upload.single('profilePhoto'), // Add file upload middleware
+  updateUser
+);
 
 module.exports = router;
