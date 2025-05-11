@@ -51,8 +51,12 @@ export default function LoginPage() {
       setTimeout(() => {
         router.push("/dashboard");
       }, 1500); // Redirect after a short delay to show success message
-    } catch (err: any) {
-      setError("Invalid credentials");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message); // If the error is an instance of Error, use the error message
+      } else {
+        setError("Invalid credentials"); // For unknown error types, show a generic message
+      }
       setIsLoading(false);
     }
   };

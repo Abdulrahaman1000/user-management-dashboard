@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../services/api';
-import Alert from '@/components/Alert';
-
+import Image from 'next/image';
 
 interface User {
   _id: string;
@@ -17,13 +16,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-   const [success, setSuccess] = useState("");
+  const [success, setSuccess] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showSuccessAlert, setShowSuccessAlert] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
 
   const router = useRouter();
 
@@ -46,9 +43,7 @@ export default function Dashboard() {
       }
 
       const res = await api.get(`/users?page=${page}&limit=5`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.data?.pages) {
@@ -63,68 +58,45 @@ export default function Dashboard() {
       setCurrentPage(page);
 
       let usersData: User[] = [];
-
-      if (res.data?.data && Array.isArray(res.data.data)) {
+      if (Array.isArray(res.data?.data)) {
         usersData = res.data.data;
       } else if (Array.isArray(res.data)) {
         usersData = res.data;
-      } else if (Array.isArray(res.data.users)) {
+      } else if (Array.isArray(res.data?.users)) {
         usersData = res.data.users;
-      } else {
-        console.error('Could not extract users from response:', res.data);
-        usersData = [];
       }
 
       const currentUser = usersData.find(user => user.role === 'admin');
-      if (currentUser) {
-        setIsAdmin(true);
-      } else {
-        if (res.data?.user?.role === 'admin' || res.data?.currentUser?.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-      }
+      setIsAdmin(currentUser ? true : false);
 
       setUsers(usersData);
       setLoading(false);
     } catch (err: any) {
       console.error('Error fetching users:', err);
-      if (err.response?.status === 401) {
-        handleLogout();
-      }
+      if (err.response?.status === 401) handleLogout();
       setLoading(false);
     }
   };
 
-  const handleAddUser = () => {
-    router.push('/users/add');
-  };
-
-  const handleEditUser = (userId: string) => {
-    router.push(`/users/${userId}`);
-  };
+  const handleAddUser = () => router.push('/users/add');
+  const handleEditUser = (userId: string) => router.push(`/users/${userId}`);
 
   const handleDeleteUser = async () => {
-      
     if (!deletingUserId) return;
-     setSuccess("");
+
+    setSuccess('');
     setLoading(true);
     const token = localStorage.getItem('token');
     try {
       const res = await api.delete(`/users/${deletingUserId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.status === 200 || res.status === 204) {
         await fetchUsers(currentPage);
         setShowDeleteModal(false);
-       
-       setSuccess('User deleted successfully!');
-        setShowSuccessAlert(true);
-        setTimeout(() => setShowSuccessAlert(false), 3000); // Hide the alert after 3 seconds
+        setSuccess('User deleted successfully!');
+        setTimeout(() => setSuccess(''), 3000); // Hide the alert after 3 seconds
       }
     } catch (err: any) {
       console.error('Error deleting user:', err);
@@ -151,25 +123,25 @@ export default function Dashboard() {
     (user.role?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
   );
 
-  if (loading) return (
-    <div className="flex justify-center items-center h-screen">
-      <p className="text-xl">Loading...</p>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-xl">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white text-black p-12 mt-20 max-w-4xl mx-auto">
-        {success && (
-          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
-            {success}
-          </div>
-        )}
+      {success && (
+        <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
+          {success}
+        </div>
+      )}
+
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-500">Dashboard</h1>
-        <button 
-          onClick={handleLogout}
-          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition"
-        >
+        <button onClick={handleLogout} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition">
           Logout
         </button>
       </div>
@@ -214,13 +186,12 @@ export default function Dashboard() {
                     {filteredUsers.map((user) => (
                       <tr key={user._id}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <img 
-                            src={user.profilePhoto ? 
-                              `${process.env.NEXT_PUBLIC_API_URL}/uploads/${user.profilePhoto}?ts=${Date.now()}` 
-                              : '/default-avatar.jpg'
-                            }
+                          <Image
+                            src={user.profilePhoto ? `${process.env.NEXT_PUBLIC_API_URL}/uploads/${user.profilePhoto}?ts=${Date.now()}` : '/default-avatar.jpg'}
                             alt="Profile"
                             className="h-10 w-10 rounded-full object-cover"
+                            width={40}
+                            height={40}
                           />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-black">{user.email}</td>
@@ -236,7 +207,7 @@ export default function Dashboard() {
                           <button
                             onClick={() => {
                               setDeletingUserId(user._id);
-                              setShowDeleteModal(true); 
+                              setShowDeleteModal(true);
                             }}
                             className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
                           >
@@ -251,7 +222,7 @@ export default function Dashboard() {
 
               {/* Pagination */}
               <div className="flex justify-center mt-4 space-x-2">
-                <button 
+                <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
                   className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
@@ -261,7 +232,7 @@ export default function Dashboard() {
                 <span className="px-3 py-1 bg-gray-100 rounded text-black">
                   Page {currentPage} of {totalPages}
                 </span>
-                <button 
+                <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
                   className={`px-3 py-1 rounded ${currentPage === totalPages ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
@@ -278,9 +249,6 @@ export default function Dashboard() {
         <p className="text-xl text-center">You do not have permission to access this page.</p>
       )}
 
-      {/* Success Alert */}
-
-      
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
