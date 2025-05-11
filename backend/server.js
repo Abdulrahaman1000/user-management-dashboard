@@ -18,11 +18,25 @@ connectDB();
 app.use(express.json());
 app.use(cookieParser());
 
-// Set up CORS to allow frontend access
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://user-management-dashboard-gj17.vercel.app'
+];
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'https://user-management-dashboard-gj17.vercel.app/', // ✅ Replace with your actual Vercel frontend URL
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'X-Requested-With'],
+  exposedHeaders: ['set-cookie']
 }));
+
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
