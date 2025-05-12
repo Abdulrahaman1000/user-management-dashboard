@@ -1,32 +1,18 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import api from '../services/api';
 import Image from 'next/image';
-
-interface User {
-  _id: string;
-  email: string;
-  role?: string;
-  name?: string;
-  profilePhoto?: string;
-}
-
-interface ApiResponse {
-  users?: User[];
-  data?: User[];
-  pages?: number;
-  totalCount?: number;
-}
-
-interface ApiError {
-  response?: {
-    status?: number;
-    data?: {
-      message?: string;
-    };
-  };
-  message?: string;
-}
+ // Separate type definitions
+import api from '../services/api';
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  PlusCircle, 
+  Edit2, 
+  Trash2, 
+  Search, 
+  LogOut 
+} from 'lucide-react';
+import { ApiError, ApiResponse, User } from '../types/user';
 
 export default function Dashboard() {
   const [users, setUsers] = useState<User[]>([]);
@@ -44,21 +30,15 @@ export default function Dashboard() {
   const handleLogout = () => {
     localStorage.clear();
     sessionStorage.clear();
-    window.location.href = '/';
+    router.push('/');
   };
 
   // Helper function to extract users data from different response formats
   const getUsersData = (data: ApiResponse | User[]): User[] => {
-    if (Array.isArray(data)) {
-      return data; // Directly return if `data` is a User[]
-    }
-    if (data && Array.isArray(data.data)) {
-      return data.data; // Return `data.data` if it's a User[]
-    }
-    if (data && Array.isArray(data.users)) {
-      return data.users; // Return `data.users` if it's a User[]
-    }
-    return []; // Return empty array if no valid data
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.data)) return data.data;
+    if (data && Array.isArray(data.users)) return data.users;
+    return [];
   };
 
   const fetchUsers = useCallback(async (page: number) => {
@@ -81,7 +61,7 @@ export default function Dashboard() {
       if (Array.isArray(data)) {
         pages = Math.ceil(data.length / 5) || 1;
       } else if (data) {
-        pages = data.pages || Math.ceil((data.totalCount || usersData.length) / 5) || 1;
+        pages = (data as ApiResponse).pages || Math.ceil(((data as ApiResponse).totalCount || usersData.length) / 5) || 1;
       }
 
       setUsers(usersData);
@@ -89,7 +69,7 @@ export default function Dashboard() {
       setTotalPages(pages);
       setCurrentPage(page);
       setLoading(false);
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Error fetching users:', err);
       const error = err as ApiError;
       if (error.response?.status === 401) {
@@ -129,7 +109,7 @@ export default function Dashboard() {
         setSuccess('User deleted successfully!');
         setTimeout(() => setSuccess(''), 3000);
       }
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('Error deleting user:', err);
       setLoading(false);
     }
@@ -150,143 +130,182 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <p className="text-xl">Loading...</p>
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white text-black p-12 mt-20 max-w-4xl mx-auto">
-      {success && (
-        <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
-          {success}
+    <div className="min-h-screen bg-gray-50 text-gray-900 p-4 sm:p-12">
+      <div className="max-w-6xl mx-auto bg-white shadow-xl rounded-xl overflow-hidden">
+        {/* Header */}
+        <div className="bg-blue-600 text-white p-6 flex justify-between items-center">
+          <h1 className="text-2xl font-bold flex items-center">
+            <span className="mr-3">Dashboard</span>
+          </h1>
+          <button 
+            onClick={handleLogout} 
+            className="flex items-center bg-white text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-md transition"
+          >
+            <LogOut className="mr-2 h-5 w-5" />
+            Logout
+          </button>
         </div>
-      )}
 
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-500">Dashboard</h1>
-        <button onClick={handleLogout} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition">
-          Logout
-        </button>
+        {isAdmin ? (
+          <div className="p-6">
+            {success && (
+              <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-md">
+                {success}
+              </div>
+            )}
+
+            {/* Users Management Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4 sm:mb-0">Manage Users</h2>
+              <button
+                onClick={handleAddUser}
+                className="flex items-center bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md transition"
+              >
+                <PlusCircle className="mr-2 h-5 w-5" />
+                Add User
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative mb-6">
+              <input
+                type="text"
+                placeholder="Search by email, ID or role..."
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            </div>
+
+            {filteredUsers.length > 0 ? (
+              <>
+                {/* Responsive Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Profile</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Role</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {filteredUsers.map((user) => (
+                        <tr key={user._id} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 whitespace-nowrap hidden md:table-cell">
+                            <Image
+                              src={user.profilePhoto ? `${process.env.NEXT_PUBLIC_API_URL}/uploads/${user.profilePhoto}?ts=${Date.now()}` : '/default-avatar.jpg'}
+                              alt="Profile"
+                              className="h-10 w-10 rounded-full object-cover"
+                              width={40}
+                              height={40}
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <div className="md:hidden mr-3">
+                                <Image
+                                  src={user.profilePhoto ? `${process.env.NEXT_PUBLIC_API_URL}/uploads/${user.profilePhoto}?ts=${Date.now()}` : '/default-avatar.jpg'}
+                                  alt="Profile"
+                                  className="h-8 w-8 rounded-full object-cover"
+                                  width={32}
+                                  height={32}
+                                />
+                              </div>
+                              {user.email}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{user.name || 'No name'}</td>
+                          <td className="px-4 py-3 text-sm hidden sm:table-cell">{user.role || 'user'}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-center space-x-2">
+                              <button
+                                onClick={() => handleEditUser(user._id)}
+                                className="text-yellow-500 hover:text-yellow-600 transition"
+                                title="Edit"
+                              >
+                                <Edit2 className="h-5 w-5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDeletingUserId(user._id);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="text-red-500 hover:text-red-600 transition"
+                                title="Delete"
+                              >
+                                <Trash2 className="h-5 w-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                <div className="flex justify-center items-center mt-6 space-x-4">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="flex items-center text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft className="mr-1" />
+                    Previous
+                  </button>
+                  <span className="text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="flex items-center text-blue-600 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    Next
+                    <ChevronRight className="ml-1" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No users found matching your search.
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-6 text-center">
+            <p className="text-xl text-gray-600">You do not have permission to access this page.</p>
+          </div>
+        )}
       </div>
 
-      {isAdmin ? (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-black">Manage Users</h2>
-            <button
-              onClick={handleAddUser}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition"
-            >
-              Add User
-            </button>
-          </div>
-
-          <div className="mb-4">
-            <input
-              type="text"
-              placeholder="Search by email, ID or role..."
-              className="w-full md:w-1/2 px-4 py-2 border border-gray-300 text-black placeholder-gray-500 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-
-          {filteredUsers.length > 0 ? (
-            <>
-              <div className="overflow-x-auto bg-white shadow rounded-lg mb-4">
-                <table className="min-w-full divide-y divide-gray-200 text-black">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Profile</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Role</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredUsers.map((user) => (
-                      <tr key={user._id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Image
-                            src={user.profilePhoto ? `${process.env.NEXT_PUBLIC_API_URL}/uploads/${user.profilePhoto}?ts=${Date.now()}` : '/default-avatar.jpg'}
-                            alt="Profile"
-                            className="h-10 w-10 rounded-full object-cover"
-                            width={40}
-                            height={40}
-                          />
-                        </td>
-                        <td className="px-6 py-4">{user.email}</td>
-                        <td className="px-6 py-4 text-sm text-gray-700">{user.name || 'No name provided'}</td>
-                        <td className="px-6 py-4 text-sm">{user.role || 'user'}</td>
-                        <td className="px-6 py-4 text-sm flex flex-col sm:flex-row gap-2">
-                          <button
-                            onClick={() => handleEditUser(user._id)}
-                            className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeletingUserId(user._id);
-                              setShowDeleteModal(true);
-                            }}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded transition"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-center mt-4 space-x-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className={`px-3 py-1 rounded ${currentPage === 1 ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                >
-                  Previous
-                </button>
-                <span className="px-3 py-1 bg-gray-100 rounded text-black">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className={`px-3 py-1 rounded ${currentPage === totalPages ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                >
-                  Next
-                </button>
-              </div>
-            </>
-          ) : (
-            <p>No users found.</p>
-          )}
-        </div>
-      ) : (
-        <p className="text-xl text-center">You do not have permission to access this page.</p>
-      )}
-
+      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded shadow-lg max-w-sm w-full text-black">
-            <h2 className="text-lg font-semibold mb-4">Confirm Deletion</h2>
-            <p className="mb-4">Are you sure you want to delete this user?</p>
-            <div className="flex justify-end gap-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800">Confirm Deletion</h2>
+            <p className="mb-6 text-gray-600">Are you sure you want to delete this user? This action cannot be undone.</p>
+            <div className="flex justify-end space-x-4">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteUser}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 transition"
               >
                 Delete
               </button>
